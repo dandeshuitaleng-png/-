@@ -80,14 +80,16 @@ const stateV2 = {
   budget: "under20",
   distance: "walkable",
   diet: "all",
-  speedPreference: "fast",
+  speedPreference: "all",
   avoidSpicy: true,
+  preferredType: "random",
   currentLocationKey: "campus",
   result: null,
   shownIds: [],
   favorites: new Set(["canteen-noodles", "chunjian-drypot", "ansha-tea-light"]),
   skippedIds: new Set(),
   disabledIds: new Set(),
+  resultMessage: "",
   favoriteFilter: "all",
   history: []
 };
@@ -114,7 +116,7 @@ const sheetsV2 = {
 };
 
 document.querySelector("#startFlipButton").addEventListener("click", () => startFlipV2(true));
-document.querySelector("#againButton").addEventListener("click", () => startFlipV2(false));
+document.querySelector("#againButton").addEventListener("click", () => startFlipV2(false, "已换一个新选择。"));
 document.querySelector("#skipButton").addEventListener("click", skipCurrentV2);
 document.querySelector("#ateButton").addEventListener("click", markCurrentAsEatenV2);
 document.querySelector("#favoriteButton").addEventListener("click", toggleCurrentFavoriteV2);
@@ -144,15 +146,14 @@ document.querySelector("#spiceSwitch").addEventListener("click", () => {
 });
 
 window.addEventListener("eatwhat:onboarding-complete", (event) => {
-  const interests = new Set(event.detail?.interests || []);
-  if (interests.has("fast")) stateV2.speedPreference = "fast";
-  if (interests.has("near")) stateV2.distance = "walkable";
-  if (interests.has("budget")) stateV2.budget = "under20";
-  if (interests.has("light")) stateV2.diet = "light";
-  if (interests.has("spicy")) stateV2.avoidSpicy = false;
-  if (interests.has("noodles")) stateV2.type = "noodles";
+  const appPreferences = event.detail?.appPreferences || {};
+  ["budget", "distance", "diet", "speedPreference", "avoidSpicy", "preferredType"].forEach((key) => {
+    if (appPreferences[key] !== undefined) stateV2[key] = appPreferences[key];
+  });
+  if (stateV2.mode === "quick") stateV2.type = "random";
   setTabV2("eat");
   renderAllV2();
+  showToastV2(event.detail?.source === "interest-edit" ? "兴趣偏好已同步到推荐条件" : "欢迎回来，默认偏好已生效");
 });
 
 document.querySelectorAll("[data-mode]").forEach((button) => {
@@ -235,7 +236,7 @@ function resetTodayQuestionsV2() {
   showToastV2("已恢复一键推荐");
 }
 
-function startFlipV2(resetCycle) {
+function startFlipV2(resetCycle, actionMessage = "") {
   if (isFlipAnimatingV2) return;
   const wasFlipped = flipCardV2.classList.contains("flipped");
   const duration = flipDurationV2();
@@ -245,6 +246,7 @@ function startFlipV2(resetCycle) {
   const buildAndReveal = () => {
     if (sequence !== flipSequenceV2) return;
     stateV2.result = buildRecommendationV2(resetCycle);
+    stateV2.resultMessage = actionMessage;
     renderResultV2();
     addHistoryV2(stateV2.result.main);
     setFlipHeightV2(flipBackFaceV2);
@@ -386,7 +388,7 @@ function matchesSpiceV2(item) {
 }
 
 function matchesTypeV2(item) {
-  if (stateV2.mode === "quick") return true;
+  if (stateV2.mode === "quick") return stateV2.preferredType === "random" ? true : matchesTypeValueV2(item, stateV2.preferredType);
   return matchesTypeValueV2(item, stateV2.type);
 }
 
@@ -447,6 +449,7 @@ function renderResultV2() {
   notice.classList.toggle("show", Boolean(stateV2.result.notice));
   document.querySelector("#healthTags").innerHTML = allTagsV2(main).slice(0, 6).map((tag) => `<span class="health-tag">${tag}</span>`).join("");
   document.querySelector("#reasons").innerHTML = buildReasonsV2(main).map((reason) => `<div class="reason">${reason}</div>`).join("");
+  document.querySelector("#resultFeedback").innerHTML = buildResultFeedbackV2(main);
   document.querySelector("#alternatives").innerHTML = stateV2.result.alternatives.map((item) => `<button class="shop" data-alt-id="${item.id}"><span>${item.name}<small>${item.category} · ¥${avgPriceV2(item)} · ${walkingTextV2(item)} · ${spiceTextV2(item)}</small></span><span>${item.wait}</span></button>`).join("");
   document.querySelector("#alternatives").querySelectorAll("[data-alt-id]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -459,9 +462,20 @@ function renderResultV2() {
   const favoriteButton = document.querySelector("#favoriteButton");
   favoriteButton.textContent = stateV2.favorites.has(main.id) ? "♥" : "♡";
   favoriteButton.setAttribute("aria-label", stateV2.favorites.has(main.id) ? "取消收藏" : "收藏推荐");
+  document.querySelector("#ateButton").textContent = hasEatenHistoryV2(main.id) ? "已记录" : "已吃";
   renderFavoritesV2();
   renderMineV2();
   persistStateV2();
+}
+
+function buildResultFeedbackV2(item) {
+  const status = [];
+  if (stateV2.resultMessage) status.push(stateV2.resultMessage);
+  if (stateV2.favorites.has(item.id)) status.push("已收藏，会提高同类推荐的权重。");
+  if (hasEatenHistoryV2(item.id)) status.push("已记录为吃过，历史页可以再次推荐。");
+  if (stateV2.skippedIds.has(item.id)) status.push("已加入近期避让，本轮会减少出现。");
+  if (status.length === 0) status.push("还没有反馈。收藏、已吃或近期不推荐都会影响后续结果。");
+  return `<strong>本次反馈</strong><span>${status.join(" ")}</span>`;
 }
 
 function buildReasonsV2(item) {
@@ -469,6 +483,7 @@ function buildReasonsV2(item) {
   if (stateV2.mode === "questions" && stateV2.type !== "random") reasons.push(`符合你刚选择的「${labelsV2.type[stateV2.type]}」`);
   if (stateV2.mode === "questions") reasons.push(`匹配你当下「${labelsV2.need[stateV2.need]}」的需求`);
   if (stateV2.mode === "quick") reasons.push(`结合 ${schoolLocationV2.name}、午餐时段和长期偏好`);
+  if (stateV2.mode === "quick" && stateV2.preferredType !== "random") reasons.push(`兴趣偏好：更常吃「${labelsV2.type[stateV2.preferredType]}」`);
   if (matchesDistanceV2(item)) reasons.push(`默认距离内：${walkingTextV2(item)}，约 ${distanceTextV2(item)}`);
   if (matchesBudgetV2(item)) reasons.push(`默认预算内：人均约 ${avgPriceV2(item)} 元`);
   if (item.speed === "快" && stateV2.speedPreference === "fast") reasons.push(`符合快出餐偏好：约 ${item.wait}`);
@@ -530,9 +545,11 @@ function toggleCurrentFavoriteV2() {
   const id = stateV2.result.main.id;
   if (stateV2.favorites.has(id)) {
     stateV2.favorites.delete(id);
+    stateV2.resultMessage = "已取消收藏。";
     showToastV2("已取消收藏");
   } else {
     stateV2.favorites.add(id);
+    stateV2.resultMessage = "已收藏，后续会更偏向类似选择。";
     showToastV2("已加入收藏，可在「收藏」中查看");
   }
   renderResultV2();
@@ -540,16 +557,19 @@ function toggleCurrentFavoriteV2() {
 
 function skipCurrentV2() {
   if (!stateV2.result) return;
+  const skippedName = stateV2.result.main.name;
   stateV2.skippedIds.add(stateV2.result.main.id);
   stateV2.shownIds.push(stateV2.result.main.id);
   showToastV2("近期将减少推荐这个选择");
-  startFlipV2(false);
+  startFlipV2(false, `已避开「${skippedName}」，正在换一个更合适的选择。`);
 }
 
 function markCurrentAsEatenV2() {
   if (!stateV2.result) return;
   addHistoryV2(stateV2.result.main, true);
+  stateV2.resultMessage = "已记录为吃过，下次推荐会参考这次选择。";
   showToastV2("已记录这次用餐，下次推荐会参考");
+  renderResultV2();
   renderMineV2();
   persistStateV2();
 }
@@ -655,13 +675,17 @@ function addHistoryV2(item, eaten = false) {
   renderMineV2();
 }
 
+function hasEatenHistoryV2(id) {
+  return stateV2.history.some((entry) => entry.id === id && entry.eaten);
+}
+
 function renderMineV2() {
   document.querySelector("#mineLocation").textContent = schoolLocationV2.name;
   document.querySelector("#mineBudget").textContent = labelsV2.budget[stateV2.budget];
   document.querySelector("#mineDistance").textContent = labelsV2.distance[stateV2.distance];
   document.querySelector("#mineTaste").textContent = `${stateV2.avoidSpicy ? "避开重辣" : "辣度不限"} / ${labelsV2.diet[stateV2.diet]}`;
-  document.querySelector("#mineFavoriteCount").textContent = `${stateV2.favorites.size} 个`;
   document.querySelector("#mineDataCount").textContent = `${diningDataV2.length - stateV2.disabledIds.size} 条可用`;
+  renderFeedbackSummaryV2();
   const historyList = document.querySelector("#historyList");
   historyList.innerHTML = stateV2.history.length === 0
     ? `<p class="empty">最近翻牌和最近吃过会显示在这里。</p>`
@@ -669,6 +693,14 @@ function renderMineV2() {
   historyList.querySelectorAll("[data-history-id]").forEach((button) => {
     button.addEventListener("click", () => recommendHistoryV2(button.dataset.historyId));
   });
+}
+
+function renderFeedbackSummaryV2() {
+  const eatenCount = stateV2.history.filter((entry) => entry.eaten).length;
+  document.querySelector("#feedbackSummary").innerHTML = `
+    <div><b>${stateV2.favorites.size}</b><span>收藏</span></div>
+    <div><b>${eatenCount}</b><span>已吃</span></div>
+    <div><b>${stateV2.skippedIds.size}</b><span>近期避让</span></div>`;
 }
 
 function recommendHistoryV2(id) {
@@ -701,11 +733,37 @@ function renderAllV2() {
   document.querySelector("#spiceSwitch").classList.toggle("off", !stateV2.avoidSpicy);
   document.querySelector("#todaySummary").textContent = stateV2.mode === "questions"
     ? `两题答案：${labelsV2.need[stateV2.need]} · ${labelsV2.type[stateV2.type]}；长期偏好：${labelsV2.budget[stateV2.budget]} · ${labelsV2.distance[stateV2.distance]}`
-    : `一键条件：${schoolLocationV2.name} · ${labelsV2.budget[stateV2.budget]} · ${labelsV2.distance[stateV2.distance]} · ${labelsV2.speedPreference[stateV2.speedPreference]}`;
+    : `一键条件：${schoolLocationV2.name} · ${buildQuickSummaryV2().join(" · ")}`;
+  renderDecisionContextV2();
   document.querySelector("#locationButton").textContent = schoolLocationV2.name;
   renderFavoritesV2();
   renderMineV2();
   persistStateV2();
+}
+
+function renderDecisionContextV2() {
+  const typeText = stateV2.mode === "questions"
+    ? labelsV2.type[stateV2.type]
+    : stateV2.preferredType === "random" ? "不限品类" : labelsV2.type[stateV2.preferredType];
+  const feedbackText = stateV2.skippedIds.size > 0
+    ? `避让 ${stateV2.skippedIds.size} 个`
+    : stateV2.history.length > 0 ? `历史 ${stateV2.history.length} 条` : "暂无反馈";
+  document.querySelector("#decisionContext").innerHTML = `
+    <div class="context-chip"><span>位置</span><b>${schoolLocationV2.name}</b></div>
+    <div class="context-chip"><span>偏好</span><b>${typeText} / ${labelsV2.speedPreference[stateV2.speedPreference]}</b></div>
+    <div class="context-chip"><span>回流</span><b>${feedbackText}</b></div>`;
+}
+
+function buildQuickSummaryV2() {
+  const parts = [
+    labelsV2.budget[stateV2.budget],
+    labelsV2.distance[stateV2.distance],
+    labelsV2.speedPreference[stateV2.speedPreference]
+  ];
+  if (stateV2.diet !== "all") parts.push(labelsV2.diet[stateV2.diet]);
+  if (stateV2.avoidSpicy) parts.push("避开重辣");
+  if (stateV2.preferredType !== "random") parts.push(`偏好${labelsV2.type[stateV2.preferredType]}`);
+  return parts;
 }
 
 function selectLocationV2(key) {
@@ -832,7 +890,7 @@ function hydrateStateV2() {
   try {
     const saved = JSON.parse(localStorage.getItem("eatWhatV2State") || "null");
     if (!saved) return;
-    ["mode", "type", "need", "mealMode", "budget", "distance", "diet", "speedPreference", "avoidSpicy", "currentLocationKey"].forEach((key) => {
+    ["mode", "type", "need", "mealMode", "budget", "distance", "diet", "speedPreference", "avoidSpicy", "preferredType", "currentLocationKey"].forEach((key) => {
       if (saved[key] !== undefined) stateV2[key] = saved[key];
     });
     stateV2.favorites = new Set(saved.favorites || []);
@@ -867,6 +925,7 @@ function persistStateV2() {
       diet: stateV2.diet,
       speedPreference: stateV2.speedPreference,
       avoidSpicy: stateV2.avoidSpicy,
+      preferredType: stateV2.preferredType,
       currentLocationKey: stateV2.currentLocationKey,
       location: schoolLocationV2,
       favorites: [...stateV2.favorites],
