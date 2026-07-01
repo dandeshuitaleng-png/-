@@ -1,0 +1,16 @@
+# AppScope/app.json5
+
+```json5
+{
+  "app": {
+    "bundleName": "com.example.eat",
+    "vendor": "example",
+    "versionCode": 1000000,
+    "versionName": "1.0.0",
+    "buildVersion": "1",
+    "icon": "$media:layered_image",
+    "label": "$string:app_name"
+  }
+}
+
+```

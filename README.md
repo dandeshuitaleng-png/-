@@ -1,60 +1,39 @@
-# 吃什么 App
+# 今天吃什么 App
 
-面向长沙师范学院安沙校区附近的吃饭决策助手。核心流程是：回答今日问题 -> 翻牌推荐 -> 收藏 / 换一张 / 查看详情 / 去这里。
+## 2.0 参赛包
 
-## 功能概览
+按 `019f1729-91df-7292-b9b8-eee535cdbe6d` 线程中的比赛要求，2.0 已新增为独立参赛包：
 
-- 今日问题：人数、想吃类型、口味、当前状态、堂食/打包/外卖
-- 翻牌推荐：根据今日偏好和长期偏好给出餐厅卡片
-- 推荐卡片：店名、品类、人均、步行时间、辣度、健康标签、出餐速度、营业时间、推荐理由
-- 收藏页：收藏餐厅筛选、取消收藏、查看详情、推荐相似
-- 我的页：默认预算、默认距离、饮食禁忌、历史记录
-- 高德接入：本地后端代理读取 `AMAP_WEB_KEY`，封装周边餐饮和步行路线接口，避免前端暴露 Key
+- `2.0-参赛包/初赛作品说明.md`：面向 2026 移动应用创新赛的初赛说明文档。
+- `2.0-参赛包/iOS原型/index.html`：iPhone 风格高保真原型，可直接打开截图。
+- `2.0-参赛包/swiftui/EatWhat2Prototype.swift`：SwiftUI MVP 骨架，后续可迁移到 Xcode 工程。
 
-## 目录结构
+原 HarmonyOS 工程保留为 1.0 技术沉淀；按比赛平台口径，2.0 不再把 HarmonyOS HAP 作为最终提交目标。
 
-```text
-app/                 Web/iOS 风格可运行原型
-  index.html         原型入口
-  app-v2.js          翻牌推荐、收藏、详情、路线交互
-  server.js          本地高德 Web 服务代理
-  start-app.ps1      Windows 启动脚本
-  .env.example       环境变量示例，不含真实 Key
-swiftui/             SwiftUI 单文件原型
-docs/                作品说明和高德接入设计文档
-```
+本目录已从 Obsidian Markdown 归档还原为 HarmonyOS 工程文件。保留 `.md` 归档文件，同时生成了对应的 `.ets`、`.json5`、`.ts`、`.json` 和 `.txt` 文件。
 
-## 本地运行 Web 原型
+## 运行方式
 
-1. 进入 `app/` 目录。
-2. 复制 `.env.example` 为 `.env.local`。
-3. 在 `.env.local` 中填入高德 Web 服务 Key：
+1. 使用 DevEco Studio 打开 `5.12-吃什么App` 目录。
+2. 等待 DevEco Studio 同步 Hvigor、HarmonyOS SDK 和 ohpm 依赖。
+3. 连接 HarmonyOS 真机或启动模拟器。
+4. 在 DevEco Studio 中运行 `entry` 模块。
 
-```env
-AMAP_WEB_KEY=你的高德Web服务Key
-PORT=8787
-```
+## 命令行验证
 
-4. 启动服务：
+如果本机已安装 HarmonyOS 命令行工具，可在项目根目录执行：
 
 ```powershell
-.\start-app.ps1
+.\hvigorw.bat test --no-daemon
+.\hvigorw.bat assembleHap --no-daemon
 ```
 
-5. 浏览器打开：
+## 当前本地工具链状态
 
-```text
-http://127.0.0.1:8787/index.html
-```
+Codex 已在项目内放置本地 JDK 17 和华为官方旧版 Command Line Tools：
 
-## 安全说明
+- `.toolchain/jdk/jdk17`
+- `.toolchain/commandline-tools`
 
-不要把 `.env.local` 或真实高德 Key 提交到仓库。前端只请求本地代理接口：
-
-- `GET /api/food/nearby`
-- `GET /api/route/walking`
-
-## 文档
-
-- [初赛作品说明](docs/初赛作品说明.md)
-- [高德地图接入方法与店铺信息设计](docs/高德地图接入方法与店铺信息设计.md)
+旧版 Command Line Tools 可以启动 `sdkmgr`，但只能列出 HarmonyOS API 9 及以下 SDK；本项目配置为 HarmonyOS `6.1.1(24)`，仍需要通过华为下载中心获取新版 Command Line Tools / SDK 后才能在命令行中完成 `hvigorw` 测试和 HAP 构建。
+%% Error: Cannot create a waypoint in a note that's not the folder note. For more information, check the instructions [here](https://github.com/IdreesInc/Waypoint) %%

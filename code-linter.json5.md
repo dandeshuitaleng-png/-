@@ -1,0 +1,37 @@
+# code-linter.json5
+
+```json5
+{
+  "files": [
+    "**/*.ets"
+  ],
+  "ignore": [
+    "**/src/ohosTest/**/*",
+    "**/src/test/**/*",
+    "**/src/mock/**/*",
+    "**/node_modules/**/*",
+    "**/oh_modules/**/*",
+    "**/build/**/*",
+    "**/.preview/**/*"
+  ],
+  "ruleSet": [
+    "plugin:@performance/recommended",
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "rules": {
+    "@security/no-unsafe-aes": "error",
+    "@security/no-unsafe-hash": "error",
+    "@security/no-unsafe-mac": "warn",
+    "@security/no-unsafe-dh": "error",
+    "@security/no-unsafe-dsa": "error",
+    "@security/no-unsafe-ecdsa": "error",
+    "@security/no-unsafe-rsa-encrypt": "error",
+    "@security/no-unsafe-rsa-sign": "error",
+    "@security/no-unsafe-rsa-key": "error",
+    "@security/no-unsafe-dsa-key": "error",
+    "@security/no-unsafe-dh-key": "error",
+    "@security/no-unsafe-3des": "error"
+  }
+}
+```
+%% Error: Cannot create a waypoint in a note that's not the folder note. For more information, check the instructions [here](https://github.com/IdreesInc/Waypoint) %%

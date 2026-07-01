@@ -1,0 +1,25 @@
+# entry/src/main/resources/dark/element/color.json
+
+```json
+{
+  "color": [
+    {
+      "name": "start_window_background",
+      "value": "#FFF8F0"
+    },
+    {
+      "name": "danger",
+      "value": "#D94A4A"
+    },
+    {
+      "name": "danger_soft",
+      "value": "#FDE8E8"
+    },
+    {
+      "name": "overlay",
+      "value": "#2F241F66"
+    }
+  ]
+}
+
+```

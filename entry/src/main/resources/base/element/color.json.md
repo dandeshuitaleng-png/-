@@ -1,0 +1,81 @@
+# entry/src/main/resources/base/element/color.json
+
+```json
+{
+  "color": [
+    {
+      "name": "start_window_background",
+      "value": "#FFF8F0"
+    },
+    {
+      "name": "page_background",
+      "value": "#FFF8F0"
+    },
+    {
+      "name": "card_background",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "brand_primary",
+      "value": "#F26A3D"
+    },
+    {
+      "name": "brand_primary_pressed",
+      "value": "#D95A32"
+    },
+    {
+      "name": "brand_soft",
+      "value": "#FFF0E8"
+    },
+    {
+      "name": "accent_warm",
+      "value": "#F6B44B"
+    },
+    {
+      "name": "text_primary",
+      "value": "#3C2B25"
+    },
+    {
+      "name": "text_secondary",
+      "value": "#7D6A63"
+    },
+    {
+      "name": "text_tertiary",
+      "value": "#AA9790"
+    },
+    {
+      "name": "border_soft",
+      "value": "#F1DED4"
+    },
+    {
+      "name": "success",
+      "value": "#3F9B63"
+    },
+    {
+      "name": "success_soft",
+      "value": "#DFF3E5"
+    },
+    {
+      "name": "warning",
+      "value": "#D9871D"
+    },
+    {
+      "name": "warning_soft",
+      "value": "#FFF3D9"
+    },
+    {
+      "name": "danger",
+      "value": "#D94A4A"
+    },
+    {
+      "name": "danger_soft",
+      "value": "#FDE8E8"
+    },
+    {
+      "name": "overlay",
+      "value": "#2F241F66"
+    }
+  ]
+}
+
+```

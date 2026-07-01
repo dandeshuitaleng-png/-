@@ -1,0 +1,25 @@
+# entry/src/main/resources/base/element/string.json
+
+```json
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "今天吃什么 App"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "快速决定今天吃什么"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "今天吃什么"
+    },
+    {
+      "name": "location_permission_reason",
+      "value": "需要获取你的位置信息，才能推荐附近的餐馆和店铺。"
+    }
+  ]
+}
+
+```
