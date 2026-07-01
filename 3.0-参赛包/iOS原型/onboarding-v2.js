@@ -37,16 +37,31 @@ const authAvatarPreviewV2 = document.querySelector("#authAvatarPreview");
 const authNicknameV2 = document.querySelector("#authNickname");
 const authPasswordV2 = document.querySelector("#authPassword");
 const authBirthdayV2 = document.querySelector("#authBirthday");
+const authInterestSummaryV2 = document.querySelector("#authInterestSummary");
+const authInterestPreviewV2 = document.querySelector("#authInterestPreview");
+const authSaveInterestsButtonV2 = document.querySelector("#authSaveInterestsButton");
+const authSkipInterestsButtonV2 = document.querySelector("#authSkipInterestsButton");
+const authInterestBackButtonV2 = document.querySelector('[data-auth-step="interests"] [data-auth-back]');
 
 let authAccountV2 = loadAuthAccountV2();
 let authGenderV2 = authAccountV2.gender || "保密";
 let authInterestsV2 = new Set(authAccountV2.interests || []);
 let authResendTimerV2 = undefined;
 let authResendSecondsV2 = 0;
+let authFlowContextV2 = "onboarding";
+let authInterestSnapshotV2 = [...authInterestsV2];
+let authInterestBackTargetV2 = "profile";
 
 document.querySelector("#authStartButton").addEventListener("click", () => showAuthStepV2("method"));
+document.querySelector("#authGuestButton").addEventListener("click", continueAsGuestV2);
 document.querySelectorAll("[data-auth-back]").forEach((button) => {
-  button.addEventListener("click", () => showAuthStepV2(button.dataset.authBack));
+  button.addEventListener("click", () => {
+    if (authFlowContextV2 === "interest-edit" && button === authInterestBackButtonV2) {
+      cancelInterestEditV2();
+      return;
+    }
+    showAuthStepV2(button.dataset.authBack);
+  });
 });
 document.querySelectorAll("[data-auth-method]").forEach((button) => {
   button.addEventListener("click", () => chooseAuthMethodV2(button.dataset.authMethod));
@@ -55,12 +70,17 @@ authGetCodeButtonV2.addEventListener("click", requestAuthCodeV2);
 document.querySelector("#authVerifyButton").addEventListener("click", verifyAuthCodeV2);
 authResendButtonV2.addEventListener("click", resendAuthCodeV2);
 document.querySelector("#authProfileButton").addEventListener("click", () => showAuthStepV2("profile"));
+document.querySelector("#authSkipProfileFromSuccessButton").addEventListener("click", () => {
+  authInterestBackTargetV2 = "success";
+  showAuthStepV2("interests");
+});
 document.querySelector("#authSaveProfileButton").addEventListener("click", () => saveAuthProfileV2(false));
 document.querySelector("#authSkipProfileButton").addEventListener("click", () => saveAuthProfileV2(true));
 document.querySelector("#authSaveInterestsButton").addEventListener("click", () => saveAuthInterestsV2(false));
 document.querySelector("#authSkipInterestsButton").addEventListener("click", () => saveAuthInterestsV2(true));
 document.querySelector("#authEnterHomeButton").addEventListener("click", completeOnboardingV2);
 document.querySelector("#restartOnboardingButton").addEventListener("click", restartOnboardingV2);
+document.querySelector("#editInterestsButton").addEventListener("click", editInterestsV2);
 
 authPhoneV2.addEventListener("input", () => {
   authPhoneV2.value = authPhoneV2.value.replace(/\D/g, "").slice(0, 11);
@@ -68,6 +88,13 @@ authPhoneV2.addEventListener("input", () => {
   updateAuthGetCodeButtonV2();
 });
 authAgreementV2.addEventListener("change", updateAuthGetCodeButtonV2);
+document.querySelectorAll("[data-auth-legal]").forEach((button) => {
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showAuthToastV2(`${button.dataset.authLegal}为原型占位，正式版接入完整文本`);
+  });
+});
 authCodeV2.addEventListener("input", () => {
   authCodeV2.value = authCodeV2.value.replace(/\D/g, "").slice(0, 6);
   setAuthErrorV2("authCodeError", "");
@@ -105,7 +132,8 @@ if (authAccountV2.onboardingComplete) {
 
 window.EatWhatOnboarding = {
   restart: restartOnboardingV2,
-  getAccount: () => ({ ...authAccountV2, interests: [...authInterestsV2] })
+  getAccount: () => ({ ...authAccountV2, interests: [...authInterestsV2] }),
+  editInterests: editInterestsV2
 };
 
 function showAuthStepV2(step) {
@@ -119,11 +147,16 @@ function showAuthStepV2(step) {
   authProgressV2.style.width = step === "welcome" ? "0%" : `${Math.round((index / (authStepOrderV2.length - 1)) * 100)}%`;
   authScrollV2.scrollTo({ top: 0, behavior: "auto" });
   if (step === "profile") hydrateAuthFormV2();
+  if (step === "interests") updateInterestContextUiV2();
   if (step === "guide") updateGuideCopyV2();
 }
 
 function chooseAuthMethodV2(method) {
   authAccountV2.registrationMethod = method;
+  if (method === "guest") {
+    continueAsGuestV2();
+    return;
+  }
   if (method === "apple") {
     authAccountV2.registered = true;
     authAccountV2.phone = "Apple ID";
@@ -134,6 +167,19 @@ function chooseAuthMethodV2(method) {
   }
   document.querySelector("#authSuccessCopy").textContent = "手机号验证已完成，现在完善资料，推荐会更贴合你的日常习惯。";
   showAuthStepV2("phone");
+}
+
+function continueAsGuestV2() {
+  authFlowContextV2 = "onboarding";
+  authAccountV2.registrationMethod = "guest";
+  authAccountV2.registered = false;
+  authAccountV2.phone = "";
+  authAccountV2.nickname = authAccountV2.nickname || "体验用户";
+  saveAuthAccountV2();
+  updateAccountSummaryV2();
+  showAuthToastV2("已进入游客体验，可先设置偏好");
+  authInterestBackTargetV2 = "method";
+  showAuthStepV2("interests");
 }
 
 function requestAuthCodeV2() {
@@ -218,6 +264,7 @@ function saveAuthProfileV2(skip) {
   setAuthErrorV2("authProfileError", "");
   saveAuthAccountV2();
   updateAccountSummaryV2();
+  authInterestBackTargetV2 = "profile";
   showAuthStepV2("interests");
 }
 
@@ -225,7 +272,14 @@ function saveAuthInterestsV2(skip) {
   if (skip) authInterestsV2.clear();
   authAccountV2.interests = [...authInterestsV2];
   saveAuthAccountV2();
+  persistAuthPreferencesToAppV2();
   updateAccountSummaryV2();
+  if (authAccountV2.onboardingComplete && authFlowContextV2 === "interest-edit") {
+    dispatchInterestUpdateV2("interest-edit");
+    hideAuthFlowV2();
+    showAuthToastV2(skip ? "已恢复通用默认条件" : "兴趣偏好已更新");
+    return;
+  }
   showAuthStepV2("guide");
 }
 
@@ -235,19 +289,33 @@ function completeOnboardingV2() {
   saveAuthAccountV2();
   persistAuthPreferencesToAppV2();
   updateAccountSummaryV2();
+  dispatchInterestUpdateV2("onboarding");
   hideAuthFlowV2();
-  window.dispatchEvent(new CustomEvent("eatwhat:onboarding-complete", {
-    detail: { interests: [...authInterestsV2], account: { ...authAccountV2 } }
-  }));
 }
 
 function restartOnboardingV2() {
+  authFlowContextV2 = "onboarding";
+  authInterestSnapshotV2 = [...authInterestsV2];
   authAccountV2.onboardingComplete = false;
   saveAuthAccountV2();
   showAuthStepV2("welcome");
 }
 
+function editInterestsV2() {
+  authInterestSnapshotV2 = [...authInterestsV2];
+  authFlowContextV2 = "interest-edit";
+  showAuthStepV2("interests");
+}
+
+function cancelInterestEditV2() {
+  authInterestsV2 = new Set(authInterestSnapshotV2);
+  renderAuthInterestsV2();
+  hideAuthFlowV2();
+  showAuthToastV2("已取消本次兴趣修改");
+}
+
 function hideAuthFlowV2() {
+  authFlowContextV2 = "onboarding";
   authFlowV2.classList.remove("show");
 }
 
@@ -289,6 +357,18 @@ function renderAuthInterestsV2() {
   document.querySelectorAll("[data-interest]").forEach((button) => {
     button.classList.toggle("active", authInterestsV2.has(button.dataset.interest));
   });
+  const preview = buildInterestPreviewV2();
+  authInterestSummaryV2.querySelector("strong").textContent = preview.title;
+  authInterestSummaryV2.querySelector("small").textContent = preview.copy;
+  authInterestPreviewV2.innerHTML = preview.items.map((item) => `<li>${item}</li>`).join("");
+  authSaveInterestsButtonV2.textContent = authInterestsV2.size > 0 ? `保存 ${authInterestsV2.size} 项偏好` : "保存偏好";
+}
+
+function updateInterestContextUiV2() {
+  const editing = authFlowContextV2 === "interest-edit" && authAccountV2.onboardingComplete;
+  authInterestBackButtonV2.textContent = editing ? "取消" : "返回";
+  authInterestBackButtonV2.dataset.authBack = editing ? "profile" : authInterestBackTargetV2;
+  authSkipInterestsButtonV2.textContent = editing ? "恢复默认条件" : "暂不设置";
 }
 
 function updateGuideCopyV2() {
@@ -303,22 +383,71 @@ function updateAccountSummaryV2() {
   const identity = authAccountV2.nickname || (authAccountV2.phone ? maskPhoneV2(authAccountV2.phone) : "游客");
   accountElement.textContent = identity;
   const labels = [...authInterestsV2].map((item) => interestLabelsV2[item]).filter(Boolean);
-  interestsElement.textContent = labels.length > 0 ? labels.slice(0, 3).join(" / ") : "暂未设置";
+  interestsElement.textContent = labels.length > 0 ? labels.slice(0, 4).join(" / ") : "暂未设置";
 }
 
 function persistAuthPreferencesToAppV2() {
   try {
     const appState = JSON.parse(localStorage.getItem(AUTH_APP_STATE_KEY_V2) || "{}");
-    if (authInterestsV2.has("fast")) appState.speedPreference = "fast";
-    if (authInterestsV2.has("near")) appState.distance = "walkable";
-    if (authInterestsV2.has("budget")) appState.budget = "under20";
-    if (authInterestsV2.has("light")) appState.diet = "light";
-    if (authInterestsV2.has("spicy")) appState.avoidSpicy = false;
-    if (authInterestsV2.has("noodles")) appState.type = "noodles";
+    Object.assign(appState, buildAppPreferencesFromInterestsV2());
     localStorage.setItem(AUTH_APP_STATE_KEY_V2, JSON.stringify(appState));
   } catch (error) {
     // 存储受限时，仍可在当前会话完成引导。
   }
+}
+
+function buildInterestPreviewV2() {
+  const appPrefs = buildAppPreferencesFromInterestsV2();
+  const selected = [...authInterestsV2].map((item) => interestLabelsV2[item]).filter(Boolean);
+  if (selected.length === 0) {
+    return {
+      title: "还没选兴趣",
+      copy: "如果先跳过，系统会使用通用默认条件。",
+      items: [
+        "默认预算保持 20 元内，方便先覆盖校园高频餐饮。",
+        "默认距离保持 1km 内，先保证步行可达。",
+        "一键推荐会先看营业状态、距离和基础偏好。"
+      ]
+    };
+  }
+  const items = [
+    `已选兴趣：${selected.join(" / ")}`
+  ];
+  items.push(`默认预算：${appPrefs.budget === "under20" ? "20 元内" : "不限预算"}`);
+  items.push(`默认距离：${appPrefs.distance === "near" ? "0.5km 内" : appPrefs.distance === "walkable" ? "1km 内" : "不限距离"}`);
+  items.push(`出餐偏好：${appPrefs.speedPreference === "fast" ? "优先快出餐" : "速度不限"}`);
+  items.push(`饮食方向：${appPrefs.diet === "light" ? "少油轻食" : "饮食不限"}`);
+  items.push(`辣度策略：${appPrefs.avoidSpicy ? "默认避开重辣" : "辣度不限"}`);
+  if (appPrefs.preferredType && appPrefs.preferredType !== "random") {
+    items.push(`一键推荐会优先考虑：${interestLabelsV2.noodles}`);
+  }
+  return {
+    title: "这些兴趣会直接影响默认推荐",
+    copy: "保存后会同步到首页的一键推荐，不用每次重新选条件。",
+    items
+  };
+}
+
+function buildAppPreferencesFromInterestsV2() {
+  return {
+    budget: authInterestsV2.has("budget") ? "under20" : "under20",
+    distance: authInterestsV2.has("near") ? "near" : "walkable",
+    diet: authInterestsV2.has("light") ? "light" : "all",
+    speedPreference: authInterestsV2.has("fast") ? "fast" : "all",
+    avoidSpicy: !authInterestsV2.has("spicy"),
+    preferredType: authInterestsV2.has("noodles") ? "noodles" : "random"
+  };
+}
+
+function dispatchInterestUpdateV2(source = authFlowContextV2) {
+  window.dispatchEvent(new CustomEvent("eatwhat:onboarding-complete", {
+    detail: {
+      interests: [...authInterestsV2],
+      account: { ...authAccountV2 },
+      appPreferences: buildAppPreferencesFromInterestsV2(),
+      source
+    }
+  }));
 }
 
 function loadAuthAccountV2() {
