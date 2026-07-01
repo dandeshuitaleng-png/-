@@ -1,4 +1,4 @@
-# 今天吃什么 App
+# NearBite App
 
 ## 2.0 参赛包
 
