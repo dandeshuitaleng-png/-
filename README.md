@@ -1,39 +1,38 @@
-# NearBite App
+# NearBite
 
-## 2.0 参赛包
+面向 2026 中国高校计算机大赛—移动应用创新赛的校园用餐决策 App。
 
-按 `019f1729-91df-7292-b9b8-eee535cdbe6d` 线程中的比赛要求，2.0 已新增为独立参赛包：
+## 当前保留内容
 
-- `2.0-参赛包/初赛作品说明.md`：面向 2026 移动应用创新赛的初赛说明文档。
-- `2.0-参赛包/iOS原型/index.html`：iPhone 风格高保真原型，可直接打开截图。
-- `2.0-参赛包/swiftui/EatWhat2Prototype.swift`：SwiftUI MVP 骨架，后续可迁移到 Xcode 工程。
+- `swiftui/EatWhat2Prototype.swift`：最新 SwiftUI 实现，包含推荐、收藏、MapKit 地图定位、距离排序和步行导航。
+- `3.0-参赛包/iOS原型/`：最新 Web 高保真原型，用于初赛截图、演示视频和交互验证，不作为最终可运行 App 提交。
+- `docs/`：初赛作品说明、版本说明、竞品分析和地图接入文档。
+- `audit/`：产品定位审查截图与分析记录。
 
-原 HarmonyOS 工程保留为 1.0 技术沉淀；按比赛平台口径，2.0 不再把 HarmonyOS HAP 作为最终提交目标。
+旧 HarmonyOS 工程、旧 Web 副本和本地 HarmonyOS 工具链已移除，避免与 iOS 参赛方向混淆。
 
-本目录已从 Obsidian Markdown 归档还原为 HarmonyOS 工程文件。保留 `.md` 归档文件，同时生成了对应的 `.ets`、`.json5`、`.ts`、`.json` 和 `.txt` 文件。
+## SwiftUI 运行要求
 
-## 运行方式
+SwiftUI 版本需要在 macOS 的 Xcode 中创建 iOS App 工程后运行：
 
-1. 使用 DevEco Studio 打开 `5.12-吃什么App` 目录。
-2. 等待 DevEco Studio 同步 Hvigor、HarmonyOS SDK 和 ohpm 依赖。
-3. 连接 HarmonyOS 真机或启动模拟器。
-4. 在 DevEco Studio 中运行 `entry` 模块。
+1. 将 `swiftui/EatWhat2Prototype.swift` 加入工程。
+2. Deployment Target 设为 iOS 17 或更高版本。
+3. 在 `Info.plist` 添加 `NSLocationWhenInUseUsageDescription`。
+4. 使用模拟器或 iPhone 验证定位、地图点位和步行导航。
 
-## 命令行验证
+当前仓库尚未包含 `.xcodeproj`，因此 SwiftUI 文件仍需迁移为真实 Xcode 工程，才能用于复赛或决赛的设备运行演示。
 
-如果本机已安装 HarmonyOS 命令行工具，可在项目根目录执行：
+## Web 原型运行
 
 ```powershell
-.\hvigorw.bat test --no-daemon
-.\hvigorw.bat assembleHap --no-daemon
+cd .\3.0-参赛包\iOS原型
+.\start-app.ps1
 ```
 
-## 当前本地工具链状态
+然后访问 `http://127.0.0.1:8787/`。
 
-Codex 已在项目内放置本地 JDK 17 和华为官方旧版 Command Line Tools：
+## 赛事材料口径
 
-- `.toolchain/jdk/jdk17`
-- `.toolchain/commandline-tools`
-
-旧版 Command Line Tools 可以启动 `sdkmgr`，但只能列出 HarmonyOS API 9 及以下 SDK；本项目配置为 HarmonyOS `6.1.1(24)`，仍需要通过华为下载中心获取新版 Command Line Tools / SDK 后才能在命令行中完成 `hvigorw` 测试和 HAP 构建。
-%% Error: Cannot create a waypoint in a note that's not the folder note. For more information, check the instructions [here](https://github.com/IdreesInc/Waypoint) %%
+- 初赛：官方模板作品说明文档；可选提交一张 App 效果图或宣传海报。
+- 复赛：作品说明文档和演示视频；产品原型或部分源代码按赛道选交。
+- 决赛：演示视频和可在 iOS/iPadOS/visionOS 设备运行的 App。
