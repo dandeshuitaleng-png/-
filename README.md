@@ -1,19 +1,20 @@
-# NearBite
+# NearBite App
 
-## 3.0 参赛包
+## 2.0 参赛包
 
-当前演示版本统一使用 3.0：
+按 `019f1729-91df-7292-b9b8-eee535cdbe6d` 线程中的比赛要求，2.0 已新增为独立参赛包：
 
-- `3.0-参赛包/iOS原型/index.html`：iPhone 风格高保真原型，可直接打开体验。
-- `docs/3.0-版本说明.md`：3.0 的定位、功能变化和后续开发建议。
+- `2.0-参赛包/初赛作品说明.md`：面向 2026 移动应用创新赛的初赛说明文档。
+- `2.0-参赛包/iOS原型/index.html`：iPhone 风格高保真原型，可直接打开截图。
+- `2.0-参赛包/swiftui/EatWhat2Prototype.swift`：SwiftUI MVP 骨架，后续可迁移到 Xcode 工程。
 
-原 HarmonyOS 工程保留为 1.0 技术沉淀；旧的 2.0 参赛包已从本地工作区移除。
+原 HarmonyOS 工程保留为 1.0 技术沉淀；按比赛平台口径，2.0 不再把 HarmonyOS HAP 作为最终提交目标。
 
 本目录已从 Obsidian Markdown 归档还原为 HarmonyOS 工程文件。保留 `.md` 归档文件，同时生成了对应的 `.ets`、`.json5`、`.ts`、`.json` 和 `.txt` 文件。
 
 ## 运行方式
 
-1. 使用 DevEco Studio 打开当前项目目录。
+1. 使用 DevEco Studio 打开 `5.12-吃什么App` 目录。
 2. 等待 DevEco Studio 同步 Hvigor、HarmonyOS SDK 和 ohpm 依赖。
 3. 连接 HarmonyOS 真机或启动模拟器。
 4. 在 DevEco Studio 中运行 `entry` 模块。
