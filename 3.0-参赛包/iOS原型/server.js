@@ -9,6 +9,8 @@ const port = Number(process.env.PORT || 8787);
 loadEnvFile(path.join(rootDir, ".env.local"));
 
 const amapKey = process.env.AMAP_WEB_KEY;
+const amapJsKey = process.env.AMAP_JS_KEY;
+const amapJsSecurityCode = process.env.AMAP_JS_SECURITY_CODE;
 const defaultLocation = {
   lng: 113.0826,
   lat: 28.3538,
@@ -30,7 +32,22 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === "/api/health") {
-      sendJson(res, 200, { ok: true, hasAmapKey: Boolean(amapKey) });
+      sendJson(res, 200, {
+        ok: true,
+        hasAmapKey: Boolean(amapKey),
+        hasAmapJsConfig: Boolean(amapJsKey && amapJsSecurityCode)
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/map/config") {
+      const configured = Boolean(amapJsKey && amapJsSecurityCode);
+      sendJson(res, 200, {
+        provider: "amap",
+        configured,
+        key: configured ? amapJsKey : "",
+        securityJsCode: configured ? amapJsSecurityCode : ""
+      });
       return;
     }
 
@@ -65,6 +82,28 @@ const server = http.createServer(async (req, res) => {
         output: "JSON"
       });
       sendJson(res, 200, normalizeWalkingRoute(raw));
+      return;
+    }
+
+    if (url.pathname === "/api/place/search") {
+      assertAmapKey();
+      const keywords = String(url.searchParams.get("keywords") || "").trim();
+      if (!keywords) {
+        const error = new Error("请输入地址或地点名称");
+        error.statusCode = 400;
+        throw error;
+      }
+      const region = String(url.searchParams.get("region") || "长沙市").trim();
+      const raw = await amapGet("/v5/place/text", {
+        keywords,
+        region,
+        city_limit: false,
+        show_fields: "business,navi,photos",
+        page_size: 10,
+        page_num: 1
+      });
+      const places = normalizeAmapPlaces(raw.pois || raw.data?.pois || []);
+      sendJson(res, 200, { places, source: "amap", count: places.length });
       return;
     }
 

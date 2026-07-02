@@ -59,12 +59,13 @@ const manualFallbackDataV2 = diningDataV2.slice();
 
 const labelsV2 = {
   people: { one: "一个人", two: "两个人", many: "多人" },
-  type: { random: "随便", noodles: "粉面", rice: "米饭", snack: "小吃", light: "轻食", midnight: "夜宵" },
+  type: { random: "随便", noodles: "粉面", rice: "米饭", snack: "小吃", light: "轻食", drink: "咖啡饮品", midnight: "夜宵" },
   taste: { light: "清淡点", normal: "正常", spicy: "想吃辣", heavy: "重口味" },
-  need: { fast: "赶时间", filling: "想吃饱", nearby: "不想走远", treat: "奖励自己" },
+  status: { fast: "越快越好", filling: "想吃顶饱", light: "想吃清爽点", comfort: "想吃舒服点", novel: "想换换口味", arrange: "直接安排" },
+  feelings: { warm: "热乎一点", hearty: "实在一点", savory: "香一点", light: "轻一点", safe: "稳一点", fresh: "新鲜一点", any: "都可以" },
   mealMode: { dinein: "堂食", takeout: "打包", delivery: "外卖", any: "都可以" },
-  budget: { all: "不限预算", under10: "10 元内", under20: "20 元内", under30: "30 元内", over30: "30 元以上" },
-  distance: { all: "不限距离", near: "0.5km 内", walkable: "1km 内", town: "2km 内" },
+  budget: { all: "不限预算", under10: "10 元内", under15: "15 元内", under20: "20 元内", under30: "30 元内", over30: "30 元以上" },
+  distance: { all: "不限距离", downstairs: "楼下优先", near: "0.5km 内", walkable: "1km 内", town: "2km 内" },
   diet: { all: "饮食不限", light: "少油轻食", vegetarian: "素食友好" },
   speedPreference: { all: "速度不限", fast: "优先快出餐" }
 };
@@ -75,7 +76,8 @@ const stateV2 = {
   people: "one",
   type: "random",
   taste: "normal",
-  need: "fast",
+  status: "",
+  feelings: [],
   mealMode: "dinein",
   budget: "under20",
   distance: "walkable",
@@ -115,7 +117,13 @@ const sheetsV2 = {
   dataSheet: document.querySelector("#dataSheet")
 };
 
-document.querySelector("#startFlipButton").addEventListener("click", () => startFlipV2(true));
+document.querySelector("#startFlipButton").addEventListener("click", () => {
+  if (stateV2.mode === "questions" && !stateV2.status) {
+    showToastV2("先选一个当前状态，再看推荐");
+    return;
+  }
+  startFlipV2(true);
+});
 document.querySelector("#againButton").addEventListener("click", () => startFlipV2(false, "已换一个新选择。"));
 document.querySelector("#skipButton").addEventListener("click", skipCurrentV2);
 document.querySelector("#ateButton").addEventListener("click", markCurrentAsEatenV2);
@@ -147,13 +155,18 @@ document.querySelector("#spiceSwitch").addEventListener("click", () => {
 
 window.addEventListener("eatwhat:onboarding-complete", (event) => {
   const appPreferences = event.detail?.appPreferences || {};
-  ["budget", "distance", "diet", "speedPreference", "avoidSpicy", "preferredType"].forEach((key) => {
+  ["budget", "distance", "diet", "speedPreference", "avoidSpicy", "preferredType", "mealMode"].forEach((key) => {
     if (appPreferences[key] !== undefined) stateV2[key] = appPreferences[key];
   });
   if (stateV2.mode === "quick") stateV2.type = "random";
   setTabV2("eat");
   renderAllV2();
-  showToastV2(event.detail?.source === "interest-edit" ? "兴趣偏好已同步到推荐条件" : "欢迎回来，默认偏好已生效");
+  if (event.detail?.source === "onboarding") {
+    startFlipV2(true);
+    showToastV2("正在按你的偏好生成推荐");
+  } else {
+    showToastV2("兴趣偏好已同步到推荐条件");
+  }
 });
 
 document.querySelectorAll("[data-mode]").forEach((button) => {
@@ -184,12 +197,36 @@ document.querySelectorAll(".sheet").forEach((sheet) => {
 document.querySelectorAll("[data-group]").forEach((group) => {
   group.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-value]");
-    if (!button) return;
-    stateV2[group.dataset.group] = button.dataset.value;
+    if (!button || button.disabled) return;
+    if (group.dataset.group === "feelings") {
+      toggleFeelingV2(button.dataset.value);
+    } else {
+      stateV2[group.dataset.group] = button.dataset.value;
+    }
     stateV2.shownIds = [];
     renderAllV2();
+    if (group.dataset.group === "status" && button.dataset.value === "arrange") {
+      stateV2.mode = "quick";
+      stateV2.status = "";
+      stateV2.feelings = [];
+      renderAllV2();
+      startFlipV2(true);
+    }
   });
 });
+
+function toggleFeelingV2(value) {
+  if (value === "any") {
+    stateV2.feelings = stateV2.feelings.includes("any") ? [] : ["any"];
+    return;
+  }
+  const selected = stateV2.feelings.filter((item) => item !== "any");
+  if (selected.includes(value)) {
+    stateV2.feelings = selected.filter((item) => item !== value);
+    return;
+  }
+  if (selected.length < 2) stateV2.feelings = [...selected, value];
+}
 document.querySelectorAll("[data-favorite-filter]").forEach((button) => {
   button.addEventListener("click", () => {
     stateV2.favoriteFilter = button.dataset.favoriteFilter;
@@ -207,6 +244,7 @@ function setTabV2(tab) {
   });
   if (tab === "favorites") renderFavoritesV2();
   if (tab === "mine") renderMineV2();
+  if (tab === "map") window.NearBiteMap?.activate();
   mainScrollV2.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -227,13 +265,13 @@ function savePreferencesV2() {
 
 function resetTodayQuestionsV2() {
   stateV2.mode = "quick";
-  stateV2.type = "random";
-  stateV2.need = "fast";
+  stateV2.status = "";
+  stateV2.feelings = [];
   stateV2.result = null;
   stateV2.shownIds = [];
   resetFlipCardV2();
   renderAllV2();
-  showToastV2("已恢复一键推荐");
+  showToastV2("已恢复直接推荐");
 }
 
 function startFlipV2(resetCycle, actionMessage = "") {
@@ -299,7 +337,7 @@ function finishFlipV2(sequence) {
   startFlipButtonV2.disabled = false;
   againButtonV2.disabled = false;
   flipCardV2.scrollIntoView({ behavior: "smooth", block: "start" });
-  showToastV2(stateV2.mode === "questions" ? "已结合两题答案生成推荐" : "已结合位置和长期偏好生成推荐");
+  showToastV2(stateV2.mode === "questions" ? "已结合当前状态和食物感觉生成推荐" : "已结合位置和长期偏好生成推荐");
 }
 
 function resetFlipCardV2() {
@@ -348,9 +386,9 @@ function candidatePoolV2() {
   let pool = openItems.filter((item) => matchesLongPrefsV2(item) && matchesTypeV2(item) && matchesTasteV2(item));
   if (pool.length > 0) return { options: pool, notice: "" };
   pool = openItems.filter((item) => matchesLongPrefsV2(item) && matchesTasteV2(item));
-  if (pool.length > 0) return { options: pool, notice: "今天想吃的类型较少，已先保留预算、距离和口味" };
+  if (pool.length > 0) return { options: pool, notice: "符合全部长期偏好的选择较少，已先保留预算、距离和口味" };
   pool = openItems.filter((item) => matchesTypeV2(item) && matchesTasteV2(item) && matchesSpiceV2(item));
-  if (pool.length > 0) return { options: pool, notice: "默认预算或距离较窄，已优先保留今日问题" };
+  if (pool.length > 0) return { options: pool, notice: "默认预算或距离较窄，已优先保留当前状态和感觉" };
   if (openItems.length > 0) return { options: openItems, notice: "当前条件过窄，已优先推荐营业中的选择" };
   return { options: diningDataV2.filter((item) => !stateV2.disabledIds.has(item.id)), notice: "当前样本里没有营业中的选择，已展示全部数据" };
 }
@@ -373,13 +411,14 @@ function matchesSpeedV2(item) {
 function matchesBudgetV2(item) {
   if (stateV2.budget === "all") return true;
   if (stateV2.budget === "under10") return avgPriceV2(item) <= 10;
+  if (stateV2.budget === "under15") return avgPriceV2(item) <= 15;
   if (stateV2.budget === "under20") return avgPriceV2(item) <= 20;
   if (stateV2.budget === "under30") return avgPriceV2(item) <= 30;
   return avgPriceV2(item) > 30;
 }
 
 function matchesDistanceV2(item) {
-  const limits = { all: Infinity, near: 0.5, walkable: 1, town: 2 };
+  const limits = { all: Infinity, downstairs: 0.2, near: 0.5, walkable: 1, town: 2 };
   return distanceKmV2(item) <= limits[stateV2.distance];
 }
 
@@ -388,8 +427,8 @@ function matchesSpiceV2(item) {
 }
 
 function matchesTypeV2(item) {
-  if (stateV2.mode === "quick") return stateV2.preferredType === "random" ? true : matchesTypeValueV2(item, stateV2.preferredType);
-  return matchesTypeValueV2(item, stateV2.type);
+  if (stateV2.mode === "questions") return true;
+  return stateV2.preferredType === "random" ? true : matchesTypeValueV2(item, stateV2.preferredType);
 }
 
 function matchesTypeValueV2(item, type) {
@@ -399,6 +438,7 @@ function matchesTypeValueV2(item, type) {
   if (type === "rice") return /饭|快餐|盖饭|蒸菜|木桶/.test(text);
   if (type === "snack") return /小吃|炸串|烧烤|茶饮|果汁/.test(text);
   if (type === "light") return /轻食|少油|低脂|控卡|低油|蔬菜多|清淡/.test(text);
+  if (type === "drink") return /茶饮|咖啡|果汁|饮品|奶茶/.test(text);
   if (type === "midnight") return /夜宵|烧烤|炸串|粥/.test(text) || closesLateV2(item);
   return true;
 }
@@ -419,14 +459,39 @@ function scoreV2(item) {
   if (matchesTypeV2(item)) value += 16;
   if (matchesTasteV2(item)) value += 9;
   if (matchesLongPrefsV2(item)) value += 12;
-  if (stateV2.mode === "questions" && stateV2.need === "fast" && item.speed === "快") value += 18;
-  if (stateV2.mode === "questions" && stateV2.need === "nearby" && distanceKmV2(item) <= 0.5) value += 22;
-  if (stateV2.mode === "questions" && stateV2.need === "filling") value += tagScoreV2(item, ["饱腹", "高蛋白", "主食稳定"]);
-  if (stateV2.mode === "questions" && stateV2.need === "treat") value += tagScoreV2(item, ["聚餐", "夜宵", "现炒", "重口味"]);
+  if (stateV2.mode === "questions" && stateV2.status === "fast") {
+    if (item.speed === "快") value += 18;
+    if (distanceKmV2(item) <= 0.5) value += 10;
+  }
+  if (stateV2.mode === "questions" && stateV2.status === "filling") value += tagScoreV2(item, ["饱腹", "高蛋白", "主食稳定", "快餐"]);
+  if (stateV2.mode === "questions" && stateV2.status === "light") value += tagScoreV2(item, ["少油", "低脂", "控卡", "低油", "蔬菜", "清淡", "汤"]);
+  if (stateV2.mode === "questions" && stateV2.status === "comfort") {
+    value += tagScoreV2(item, ["汤面", "汤粉", "主食稳定", "家常", "现炒"]);
+    if (stateV2.favorites.has(item.id) || hasEatenHistoryV2(item.id)) value += 10;
+  }
+  if (stateV2.mode === "questions" && stateV2.status === "novel" && !stateV2.history.some((entry) => entry.id === item.id)) value += 18;
+  if (stateV2.mode === "questions") value += feelingScoreV2(item);
   if (stateV2.people === "many") value += tagScoreV2(item, ["聚餐", "多人用餐"]);
   if (stateV2.mealMode === "takeout" && item.speed === "快") value += 8;
   if (stateV2.mealMode === "delivery" && distanceKmV2(item) <= 1.2) value += 8;
-  return Math.max(55, Math.min(99, value));
+  return value;
+}
+
+function feelingScoreV2(item) {
+  const text = searchTextV2(item);
+  return stateV2.feelings.reduce((value, feeling) => {
+    if (feeling === "warm" && /汤|面|粉|粥|麻辣烫|砂锅|热/.test(text)) return value + 14;
+    if (feeling === "hearty" && /饭|套餐|粉|面|快餐|饱腹|高蛋白/.test(text)) return value + 14;
+    if (feeling === "savory" && /炸|烧烤|香锅|湘菜|重口味|小吃|现炒/.test(text)) return value + 14;
+    if (feeling === "light" && /少油|低脂|控卡|低油|轻食|清淡|粥|汤|蔬菜/.test(text)) return value + 14;
+    if (feeling === "safe") {
+      if (Number(item.amapRating || 0) >= 4.3) value += 8;
+      if (stateV2.favorites.has(item.id) || hasEatenHistoryV2(item.id)) value += 8;
+      return value;
+    }
+    if (feeling === "fresh" && !stateV2.history.some((entry) => entry.id === item.id)) return value + 16;
+    return value;
+  }, 0);
 }
 
 function tagScoreV2(item, keywords) {
@@ -480,8 +545,13 @@ function buildResultFeedbackV2(item) {
 
 function buildReasonsV2(item) {
   const reasons = [];
-  if (stateV2.mode === "questions" && stateV2.type !== "random") reasons.push(`符合你刚选择的「${labelsV2.type[stateV2.type]}」`);
-  if (stateV2.mode === "questions") reasons.push(`匹配你当下「${labelsV2.need[stateV2.need]}」的需求`);
+  if (stateV2.mode === "questions" && stateV2.status === "fast") reasons.push(`越快越好：${walkingTextV2(item)}，出餐约 ${item.wait}`);
+  if (stateV2.mode === "questions" && stateV2.status === "filling") reasons.push("想吃顶饱：优先匹配主食、套餐和分量扎实的选择");
+  if (stateV2.mode === "questions" && stateV2.status === "light") reasons.push("想吃清爽点：优先匹配少油、清淡和蔬菜类选择");
+  if (stateV2.mode === "questions" && stateV2.status === "comfort") reasons.push("想吃舒服点：优先匹配热乎、熟悉和稳定的选择");
+  if (stateV2.mode === "questions" && stateV2.status === "novel") reasons.push("想换换口味：已降低近期重复，优先没推荐过的选择");
+  const selectedFeelings = stateV2.feelings.filter((feeling) => feeling !== "any").map((feeling) => labelsV2.feelings[feeling]);
+  if (stateV2.mode === "questions" && selectedFeelings.length > 0) reasons.push(`今天想要：${selectedFeelings.join(" · ")}`);
   if (stateV2.mode === "quick") reasons.push(`结合 ${schoolLocationV2.name}、午餐时段和长期偏好`);
   if (stateV2.mode === "quick" && stateV2.preferredType !== "random") reasons.push(`兴趣偏好：更常吃「${labelsV2.type[stateV2.preferredType]}」`);
   if (matchesDistanceV2(item)) reasons.push(`默认距离内：${walkingTextV2(item)}，约 ${distanceTextV2(item)}`);
@@ -667,7 +737,9 @@ function addHistoryV2(item, eaten = false) {
   stateV2.history.unshift({
     id: item.id,
     name: item.name,
-    context: stateV2.mode === "questions" ? `${labelsV2.type[stateV2.type]} · ${labelsV2.need[stateV2.need]}` : "一键推荐",
+    context: stateV2.mode === "questions"
+      ? `${labelsV2.status[stateV2.status]}${stateV2.feelings.filter((feeling) => feeling !== "any").length ? ` · ${stateV2.feelings.filter((feeling) => feeling !== "any").map((feeling) => labelsV2.feelings[feeling]).join(" + ")}` : ""}`
+      : "直接推荐",
     eaten,
     time: currentTimeV2
   });
@@ -719,21 +791,30 @@ function renderAllV2() {
   document.querySelectorAll("[data-group]").forEach((group) => {
     const value = stateV2[group.dataset.group];
     group.querySelectorAll("[data-value]").forEach((button) => {
-      button.classList.toggle("active", button.dataset.value === String(value));
+      const isFeelings = group.dataset.group === "feelings";
+      const isActive = isFeelings ? stateV2.feelings.includes(button.dataset.value) : button.dataset.value === String(value);
+      button.classList.toggle("active", isActive);
+      button.disabled = isFeelings
+        ? stateV2.feelings.length >= 2 && !stateV2.feelings.includes("any") && !isActive && button.dataset.value !== "any"
+        : false;
     });
   });
   document.querySelectorAll("[data-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.mode === stateV2.mode);
   });
   document.querySelector("#questionModePanel").classList.toggle("show", stateV2.mode === "questions");
-  document.querySelector("#startFlipButton").textContent = stateV2.mode === "questions" ? "按两题答案推荐" : "帮我决定";
+  document.querySelector("#startFlipButton").textContent = stateV2.mode === "questions" ? "看推荐" : "直接推荐一家";
   document.querySelector("#flipCopy").textContent = stateV2.mode === "questions"
-    ? "只回答两个问题，系统会结合长期偏好给出一个明确答案。"
+    ? "第一题选当前状态，第二题最多选两个感觉；没有特别想法也可以跳过第二题。"
     : "按当前位置、用餐时间和长期偏好，直接给出一个附近可去的选择。";
   document.querySelector("#spiceSwitch").classList.toggle("off", !stateV2.avoidSpicy);
+  document.querySelector("#feelingCount").textContent = stateV2.feelings.includes("any")
+    ? "已选：都可以"
+    : `已选 ${stateV2.feelings.length}/2`;
+  const feelingSummary = stateV2.feelings.filter((feeling) => feeling !== "any").map((feeling) => labelsV2.feelings[feeling]).join(" + ") || "未限定感觉";
   document.querySelector("#todaySummary").textContent = stateV2.mode === "questions"
-    ? `两题答案：${labelsV2.need[stateV2.need]} · ${labelsV2.type[stateV2.type]}；长期偏好：${labelsV2.budget[stateV2.budget]} · ${labelsV2.distance[stateV2.distance]}`
-    : `一键条件：${schoolLocationV2.name} · ${buildQuickSummaryV2().join(" · ")}`;
+    ? `即时校准：${stateV2.status ? labelsV2.status[stateV2.status] : "请选择当前状态"} · ${feelingSummary}；长期偏好仍作为基础条件`
+    : `直接推荐条件：${schoolLocationV2.name} · ${buildQuickSummaryV2().join(" · ")}`;
   renderDecisionContextV2();
   document.querySelector("#locationButton").textContent = schoolLocationV2.name;
   renderFavoritesV2();
@@ -742,15 +823,15 @@ function renderAllV2() {
 }
 
 function renderDecisionContextV2() {
-  const typeText = stateV2.mode === "questions"
-    ? labelsV2.type[stateV2.type]
+  const preferenceText = stateV2.mode === "questions"
+    ? stateV2.status ? labelsV2.status[stateV2.status] : "待选当前状态"
     : stateV2.preferredType === "random" ? "不限品类" : labelsV2.type[stateV2.preferredType];
   const feedbackText = stateV2.skippedIds.size > 0
     ? `避让 ${stateV2.skippedIds.size} 个`
     : stateV2.history.length > 0 ? `历史 ${stateV2.history.length} 条` : "暂无反馈";
   document.querySelector("#decisionContext").innerHTML = `
     <div class="context-chip"><span>位置</span><b>${schoolLocationV2.name}</b></div>
-    <div class="context-chip"><span>偏好</span><b>${typeText} / ${labelsV2.speedPreference[stateV2.speedPreference]}</b></div>
+    <div class="context-chip"><span>${stateV2.mode === "questions" ? "当前状态" : "偏好"}</span><b>${preferenceText} / ${labelsV2.speedPreference[stateV2.speedPreference]}</b></div>
     <div class="context-chip"><span>回流</span><b>${feedbackText}</b></div>`;
 }
 
@@ -890,9 +971,10 @@ function hydrateStateV2() {
   try {
     const saved = JSON.parse(localStorage.getItem("eatWhatV2State") || "null");
     if (!saved) return;
-    ["mode", "type", "need", "mealMode", "budget", "distance", "diet", "speedPreference", "avoidSpicy", "preferredType", "currentLocationKey"].forEach((key) => {
+    ["mode", "status", "mealMode", "budget", "distance", "diet", "speedPreference", "avoidSpicy", "preferredType", "currentLocationKey"].forEach((key) => {
       if (saved[key] !== undefined) stateV2[key] = saved[key];
     });
+    stateV2.feelings = Array.isArray(saved.feelings) ? saved.feelings.filter((feeling) => labelsV2.feelings[feeling]).slice(0, 2) : [];
     stateV2.favorites = new Set(saved.favorites || []);
     stateV2.skippedIds = new Set(saved.skippedIds || []);
     stateV2.disabledIds = new Set(saved.disabledIds || []);
@@ -917,8 +999,8 @@ function persistStateV2() {
   try {
     localStorage.setItem("eatWhatV2State", JSON.stringify({
       mode: stateV2.mode,
-      type: stateV2.type,
-      need: stateV2.need,
+      status: stateV2.status,
+      feelings: stateV2.feelings,
       mealMode: stateV2.mealMode,
       budget: stateV2.budget,
       distance: stateV2.distance,
